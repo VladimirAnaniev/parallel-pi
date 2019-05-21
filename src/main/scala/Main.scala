@@ -1,14 +1,13 @@
 import java.io.{File, PrintWriter}
 
-//import com.sun.java.util.jar.pack.Package.File
-import org.apache.commons.cli.CommandLine
-import org.apfloat.Apfloat
+import com.typesafe.scalalogging.LazyLogging
 
-//import scala.sys.process.processInternal.File
+import org.apache.commons.cli.CommandLine
+
 import scala.util.{Failure, Success}
 
 
-object Main {
+object Main extends LazyLogging {
   private val DEFAULT_TASKS = "1"
   private val DEFAULT_PRECISION = "100"
   private val DEFAULT_OUTPUT_FILE = "output.txt"
@@ -28,15 +27,15 @@ object Main {
     val output: String = parameters.getOptionValue(CliParser.outputOption.getOpt, DEFAULT_OUTPUT_FILE)
     val quiet: Boolean = parameters.hasOption(CliParser.quietOption.getOpt)
 
-    println(s"$tasks $precision $quiet")
 
-    val t1 = System.nanoTime
+    logger.info("Starting pi calculation with precision {}. Number of tasks: {} ", precision, tasks)
 
-    val writer = new PrintWriter(new File(output))
-    writer.write(PiCalculator.getPi(precision, tasks).toString())
-    writer.close()
+    val timingResult = Timer.time {
+      val writer = new PrintWriter(new File(output))
+      writer.write(PiCalculator(precision, tasks).calculate().toString())
+      writer.close()
+    }
 
-    val duration = (System.nanoTime - t1) / 1e9d
-    println(duration + " seconds")
+    logger.info("Total execution time {}ms", timingResult.time)
   }
 }

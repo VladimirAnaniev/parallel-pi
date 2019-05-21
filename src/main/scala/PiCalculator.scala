@@ -1,59 +1,71 @@
+import java.util.concurrent.Executors
+
+import com.typesafe.scalalogging.LazyLogging
 import org.apfloat.{Apfloat, ApfloatMath, Apint, ApintMath}
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
-import scala.concurrent.ExecutionContext.Implicits.global
+case class PiCalculator(precision: Long, tasks: Int) extends LazyLogging {
+  private val threadPool = Executors.newFixedThreadPool(tasks)
+  private implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(threadPool)
 
-object PiCalculator {
-  def getPi(precision: Long, tasks: Int = 1): Apfloat = new Apfloat(1) divide getOneOverPi(precision, tasks)
-
-  private val factorialStream: Stream[Apint] = new Apint(1) #:: (factorialStream zip Stream.from(1)).map { case (x, y) => x.multiply(new Apint(y)) }
-  private val denominators: Stream[Apint] = new Apint(1) #:: (denominators zip Stream.continually(new Apint(24591257856l))).map { case (x, y) => x.multiply(y) }
-  private val numerators: Stream[Apint] = new Apint(1103) #:: (numerators zip Stream.continually(new Apint(26390))).map { case (x, y) => x.add(y) }
-
-  private def sqrt2(precision: Long): Apfloat = ApfloatMath.sqrt(new Apfloat(2, precision))
-
-  private def getPartialSum(k: Int, precision: Long): Apfloat = {
-    val factorial4k: Apint = factorialStream(4 * k)
-    val factkToThe4th: Apint = ApintMath.pow(factorialStream(k), 4)
-    val denominator: Apint = denominators(k)
-    val numerator = numerators(k)
-
-    factorial4k.multiply(numerator).divide(factkToThe4th.multiply(denominator).real().precision(precision))
+  private def factorial(k: Int): Apint = {
+    ApintMath.factorial(k)
   }
 
+  private def denominator(k: Int): Apint = ApintMath.pow(new Apint(24591257856l), k)
 
-  private def getOneOverPi(precision: Long, tasks: Int): Apfloat = {
-    val const = sqrt2(precision).multiply(new Apfloat(2)).divide(new Apfloat(9801))
+  private def numerator(k: Int): Apint = new Apint(1103).add(new Apint(26390).multiply(new Apint(k)))
 
-    val futurePartialSums = for (t <- 0 until tasks) yield getFuturePartialSums(t, tasks, precision)
+  def calculate(): Apfloat = {
+    new Apfloat(1) divide oneOverPi
+  }
 
-    val h = System.nanoTime
+  private def sqrt2(): Apfloat = ApfloatMath.sqrt(new Apfloat(2).precision(precision))
+
+
+  private def oneOverPi: Apfloat = {
+    val const = sqrt2().multiply(new Apfloat(2)).divide(new Apfloat(9801))
+
+    val futurePartialSums = for (t <- 0 until tasks) yield getPartialSums(t)
     val sum = Await.result(Future.sequence(futurePartialSums), Duration.Inf).reduce((cur, acc) => cur.add(acc))
-    println((System.nanoTime - h) / 1e9d)
 
     const.multiply(sum)
   }
 
-  private def getFuturePartialSums(task: Int, tasks: Int, precision: Long): Future[Apfloat] = {
-    // TODO: refactor this :)
+  private def getPartialSums(task: Int): Future[Apfloat] = {
     Future {
-      println(s"Thread $task started")
-      var sum = new Apfloat(0, precision)
-
-      def addSums(): Unit = {
-        for (k <- task to(precision.toInt, tasks)) {
-          val newSum = getPartialSum(k, precision)
-          sum = sum.add(newSum)
-          if (newSum.scale < -precision) return
-        }
+      logger.info("Thread {} started", task + 1)
+      val timingResult = Timer.time {
+        addSums(task)
       }
+      logger.info("Thread {} finished. Execution time was {}ms", task + 1, timingResult.time)
 
-      addSums()
-
-      println(s"Thread $task finished")
-      sum
+      timingResult.result
     }
+  }
+
+  def addSums(task: Int): Apfloat = {
+    var sum: Apfloat = new Apfloat(0)
+
+    var k = task
+    var newNum = new Apfloat(0)
+    do {
+      newNum = getPartialSum(k)
+      sum = sum.add(newNum)
+      k += tasks
+    } while(newNum.scale > -precision)
+
+    sum
+  }
+
+  private def getPartialSum(k: Int): Apfloat = {
+    val factorial4k: Apint = factorial(4 * k)
+    val factkToThe4th: Apint = ApintMath.pow(factorial(k), 4)
+    val denom: Apint = denominator(k)
+    val num = numerator(k)
+
+    factorial4k.multiply(num).divide(factkToThe4th.multiply(denom).real().precision(precision))
   }
 }
