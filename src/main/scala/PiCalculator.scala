@@ -6,7 +6,7 @@ import org.apfloat.{Apfloat, ApfloatMath, Apint, ApintMath}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-case class PiCalculator(precision: Long, tasks: Int) extends LazyLogging {
+case class PiCalculator(precision: Long, tasks: Int, quiet: Boolean) extends LazyLogging {
   private val threadPool = Executors.newFixedThreadPool(tasks)
   private implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(threadPool)
 
@@ -36,11 +36,11 @@ case class PiCalculator(precision: Long, tasks: Int) extends LazyLogging {
 
   private def getPartialSums(task: Int): Future[Apfloat] = {
     Future {
-      logger.info("Thread {} started", task + 1)
+      if (!quiet) logger.info("Thread {} started", task + 1)
       val timingResult = Timer.time {
         addSums(task)
       }
-      logger.info("Thread {} finished. Execution time was {}ms", task + 1, timingResult.time)
+      if (!quiet) logger.info("Thread {} finished. Execution time was {}ms", task + 1, timingResult.time)
 
       timingResult.result
     }

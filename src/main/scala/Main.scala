@@ -17,7 +17,9 @@ object Main extends LazyLogging {
 
     commandLine match {
       case Success(line) => run(line)
-      case Failure(e) => println(e.getMessage); CliParser.printHelp()
+      case Failure(e) =>
+        println(e.getMessage)
+        CliParser.printHelp()
     }
   }
 
@@ -27,15 +29,16 @@ object Main extends LazyLogging {
     val output: String = parameters.getOptionValue(CliParser.outputOption.getOpt, DEFAULT_OUTPUT_FILE)
     val quiet: Boolean = parameters.hasOption(CliParser.quietOption.getOpt)
 
-
     logger.info("Starting pi calculation with precision {}. Number of tasks: {} ", precision, tasks)
 
     val timingResult = Timer.time {
       val writer = new PrintWriter(new File(output))
-      writer.write(PiCalculator(precision, tasks).calculate().toString())
+      writer.write(PiCalculator(precision, tasks, quiet).calculate().toString())
       writer.close()
     }
 
     logger.info("Total execution time {}ms", timingResult.time)
+
+    System.exit(0)
   }
 }
