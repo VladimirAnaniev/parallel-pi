@@ -33,7 +33,7 @@ object Main extends LazyLogging {
 
     val timingResult = Timer.time {
       val writer = new PrintWriter(new File(output))
-      writer.write(PiCalculator(precision, tasks, quiet).calculate().toString())
+      writer.write(PiStreamCalculator(precision, tasks, quiet).calculate().toString())
       writer.close()
     }
 

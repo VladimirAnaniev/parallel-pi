@@ -6,7 +6,7 @@ import org.apfloat.{Apfloat, ApfloatMath, Apint, ApintMath}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-case class PiCalculator(precision: Long, tasks: Int, quiet: Boolean) extends LazyLogging {
+case class PiStreamCalculator(precision: Long, tasks: Int, quiet: Boolean) extends LazyLogging {
   private val threadPool = Executors.newFixedThreadPool(tasks)
   private implicit val executionContext: ExecutionContext = ExecutionContext.fromExecutor(threadPool)
 
@@ -53,19 +53,15 @@ case class PiCalculator(precision: Long, tasks: Int, quiet: Boolean) extends Laz
   }
 
   private def getPartialSum(k: Int): Apfloat = {
-    val factorial4k: Apint = factorial(4 * k)
-    val factkToThe4th: Apint = ApintMath.pow(factorial(k), 4)
-    val denom: Apint = denominator(k)
-    val num = numerator(k)
+    val factorial4k: Apint = factorialStream(4 * k)
+    val factkToThe4th: Apint = ApintMath.pow(factorialStream(k), 4)
+    val denom: Apint = denominators(k)
+    val num = numerators(k)
 
     factorial4k.multiply(num).divide(factkToThe4th.multiply(denom).real().precision(precision))
   }
 
-  private def factorial(k: Int): Apint = {
-    ApintMath.factorial(k)
-  }
-
-  private def denominator(k: Int): Apint = ApintMath.pow(new Apint(24591257856l), k)
-
-  private def numerator(k: Int): Apint = new Apint(1103).add(new Apint(26390).multiply(new Apint(k)))
+  private val factorialStream: Stream[Apint] = new Apint(1) #:: (factorialStream zip Stream.from(1)).map { case (x, y) => x.multiply(new Apint(y)) }
+  private val denominators: Stream[Apint] = new Apint(1) #:: (denominators zip Stream.continually(new Apint(24591257856l))).map { case (x, y) => x.multiply(y) }
+  private val numerators: Stream[Apint] = new Apint(1103) #:: (numerators zip Stream.continually(new Apint(26390))).map { case (x, y) => x.add(y) }
 }
